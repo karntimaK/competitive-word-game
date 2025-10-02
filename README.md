@@ -35,7 +35,7 @@ competitive-word-game/
 
 1. **Clone Repository**
 ```bash
-git clone https://github.com/yourusername/competitive-word-game.git
+git clone https://github.com/karntimaK/competitive-word-game.git
 cd competitive-word-game
 ````
 
