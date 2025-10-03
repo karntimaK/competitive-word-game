@@ -3,12 +3,18 @@ from flask_socketio import SocketIO, emit, join_room
 import uuid
 import os
 import sys
+import eventlet
+
+# เพิ่ม path ของ game_core
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 from game_core.core_logic import WordGame
 
+# Flask app + SocketIO
 app = Flask(__name__, static_folder="../../static", template_folder="../../client")
-socketio = SocketIO(app, cors_allowed_origins="*")
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode="eventlet")
 
+# Waiting players และ game rooms
 waiting_players = []
 rooms = {}
 
@@ -23,10 +29,18 @@ def index():
 
 @socketio.on("connect")
 def on_connect(auth):
-    print("A user connected:", request.sid)
+    print(f"A user connected: {request.sid}")
 
 
-@socketio.on('find_match')
+@socketio.on("disconnect")
+def on_disconnect():
+    print(f"User disconnected: {request.sid}")
+    # ลบจาก waiting_players ถ้ามี
+    global waiting_players
+    waiting_players = [p for p in waiting_players if p["sid"] != request.sid]
+
+
+@socketio.on("find_match")
 def on_find_match(data):
     username = data.get("username", "Anonymous")
     emit("status", {"message": "Searching for a match..."})
@@ -44,7 +58,8 @@ def on_find_match(data):
         room_id = str(uuid.uuid4())[:8]
         players = [p1, p2]
 
-        game_instance = WordGame()  
+        # สร้าง WordGame ใหม่
+        game_instance = WordGame()
         secret = game_instance.start_new_game()
         print(f"[DEBUG] Room {room_id} secret word: {secret}")
 
@@ -83,10 +98,10 @@ def on_submit_guess(data):
     # เก็บคำและ feedback
     rooms[room_id]["guesses"][request.sid].append({"word": guess, "feedback": feedback})
 
-    # ส่งให้ผู้เล่นตัวเอง
+    # ส่ง feedback ให้ผู้เล่นตัวเอง
     emit("update_board", {"guess": guess, "feedback": feedback}, room=request.sid)
 
-    # ส่งให้คู่ต่อสู้ → แค่ feedback
+    # ส่ง feedback ให้คู่ต่อสู้
     opponent_sid = None
     for p in rooms[room_id]["players"]:
         if p["sid"] != request.sid:
@@ -94,7 +109,7 @@ def on_submit_guess(data):
             emit("update_opponent_board", {"feedback": feedback}, room=opponent_sid)
 
     # ตรวจเงื่อนไขชนะ
-    # 1. ผู้เล่นตัวเองใส่คำถูกต้อง
+    # 1. ผู้เล่นใส่คำถูกต้อง
     if guess == game_instance.secret_word:
         emit("game_result", {"result": "win"}, room=request.sid)
         if opponent_sid:
@@ -110,8 +125,5 @@ def on_submit_guess(data):
 
 
 if __name__ == "__main__":
-    import eventlet
-    import eventlet.wsgi
-    from flask_socketio import SocketIO
-
+    print("Starting server on http://0.0.0.0:5000 ...")
     socketio.run(app, host="0.0.0.0", port=5000)
