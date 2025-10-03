@@ -8,11 +8,10 @@ document.addEventListener("DOMContentLoaded", () => {
   let opponentGuessCount = 0;
 
   // สร้าง div สำหรับแสดง status message
-  const statusDiv = document.createElement("div");
+  let statusDiv = document.createElement("div");
   statusDiv.id = "status_message";
   document.body.appendChild(statusDiv);
 
-  // update status helper
   function updateStatus(message) {
     statusDiv.innerText = message;
   }
@@ -24,10 +23,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // find match
   window.findMatch = function() {
-    playerName = document.getElementById("username").value || "Anonymous";
-    updateStatus("Finding match...");
-    socket.emit("find_match", { username: playerName });
-  };
+          playerName = document.getElementById("username").value || "Anonymous";
+          const resultDiv = document.getElementById("result_message");
+          if(resultDiv) resultDiv.innerText = ""; // เคลียร์ข้อความเดิม
+          updateStatus("Finding match...");
+          socket.emit("find_match", { username: playerName });
+        };
+
 
   // matched
   socket.on("matched", (data) => {
@@ -58,9 +60,12 @@ document.addEventListener("DOMContentLoaded", () => {
       <div id="status_message"></div>
     `;
 
-    // สร้างตาราง
     createBoard("player_board");
     createBoard("opponent_table", true);
+
+    // reset guess counts
+    playerGuessCount = 0;
+    opponentGuessCount = 0;
   });
 
   // สร้างตาราง
@@ -76,7 +81,7 @@ document.addEventListener("DOMContentLoaded", () => {
         td.style.height = "30px";
         td.style.textAlign = "center";
         td.style.verticalAlign = "middle";
-        td.style.backgroundColor = isOpponent ? "#ddd" : "#fff";
+        td.style.backgroundColor = isOpponent ? "#eee" : "#fff";
         td.innerText = "";
         tr.appendChild(td);
       }
@@ -92,12 +97,10 @@ document.addEventListener("DOMContentLoaded", () => {
       alert("Enter a 5-letter word");
       return;
     }
-
     if (!roomId) {
       updateStatus("You are not in a room yet.");
       return;
     }
-
     updateStatus(`Submitting guess: ${guess}`);
     socket.emit("submit_guess", { room: roomId, guess: guess });
     input.value = "";
@@ -120,12 +123,10 @@ document.addEventListener("DOMContentLoaded", () => {
         else cell.style.backgroundColor = "#ccc"; // GREY
       }
     }
-
     playerGuessCount++;
-    updateStatus(`Last guess: ${guess}`);
   });
 
-  // update opponent board (แสดง feedback ล่าสุด)
+  // update opponent board (feedback สีเท่านั้น)
   socket.on("update_opponent_board", (data) => {
     const feedback = data.feedback;
     const table = document.getElementById("opponent_table");
@@ -137,10 +138,9 @@ document.addEventListener("DOMContentLoaded", () => {
         const cell = row.cells[i];
         if (feedback[i] === "G") cell.style.backgroundColor = "green";
         else if (feedback[i] === "Y") cell.style.backgroundColor = "yellow";
-        else cell.style.backgroundColor = "#ccc";
+        else cell.style.backgroundColor = "#aaa";
       }
     }
-
     opponentGuessCount++;
   });
 
@@ -148,4 +148,28 @@ document.addEventListener("DOMContentLoaded", () => {
   socket.on("status", (data) => {
     if (data.message) updateStatus(data.message);
   });
+
+  // game result
+  // กลับไปหน้าหาห้อง พร้อมแสดงผล
+        socket.on("game_result", (data) => {
+          let resultMessage = "";
+          if (data.result === "win") resultMessage = "You win!";
+          else if (data.result === "lose") resultMessage = "You lose!";
+
+          document.body.innerHTML = `
+                <h2>Competitive Word Game</h2>
+                <input type="text" id="username" placeholder="Enter your name">
+                <button id="find_button">Find Match</button>
+                <div id="result_message" style="margin-top:10px; font-weight:bold;">${resultMessage}</div>
+                <div id="status_message"></div>
+          `;
+
+          // สร้าง reference ใหม่ให้ statusDiv
+          statusDiv = document.getElementById("status_message");
+
+          // attach event
+          document.getElementById("find_button").addEventListener("click", () => {
+                findMatch();
+          });
+        });
 });
