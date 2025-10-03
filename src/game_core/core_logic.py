@@ -1,4 +1,5 @@
 from collections import Counter
+from .dictionary import get_word_list
 import random
 
 GREEN = 'G'
@@ -6,23 +7,24 @@ YELLOW = 'Y'
 GREY = 'X'
 
 class WordGame:
-    """Class สำหรับจัดการตรรกะหลักของเกมเดาคำศัพท์"""
+    def __init__(self):
+        self.word_list = get_word_list()
+        self.secret_word = ""
 
-    def __init__(self, secret_word=None):
-        # ให้สามารถ set secret_word โดยตรงได้
-        self.secret_word = secret_word or self._random_word()
-        self.word_list = []  # placeholder ยังไม่ใช้ dictionary จริง
+    def start_new_game(self):
+        if not self.word_list:
+            raise Exception("No words in dictionary")
+        self.secret_word = random.choice(self.word_list)
+        return self.secret_word
 
-    def _random_word(self):
-        # mock คำลับ 5 ตัว
-        sample_words = ["APPLE", "TRAIN", "CRANE", "ERROR", "BANJO"]
-        return random.choice(sample_words)
+    def validate_guess(self, guess: str) -> bool:
+        guess = guess.upper()
+        return len(guess) == 5 and guess in self.word_list
 
-    def check_guess(self, guess: str) -> list[str]:
-        """ให้ผลตอบรับเป็นสี (G, Y, X) สำหรับคำที่ทายเทียบกับคำลับ"""
+    def check_guess(self, guess: str):
         guess = guess.upper()
         target = self.secret_word.upper()
-        result = [GREY] * 5
+        result = [GREY]*5
         target_counts = Counter(target)
 
         # Green
@@ -30,12 +32,9 @@ class WordGame:
             if guess[i] == target[i]:
                 result[i] = GREEN
                 target_counts[guess[i]] -= 1
-
         # Yellow
         for i in range(5):
-            if result[i] == GREY:
-                char = guess[i]
-                if target_counts.get(char, 0) > 0:
-                    result[i] = YELLOW
-                    target_counts[char] -= 1
+            if result[i] == GREY and target_counts.get(guess[i], 0) > 0:
+                result[i] = YELLOW
+                target_counts[guess[i]] -= 1
         return result
