@@ -110,5 +110,8 @@ def on_submit_guess(data):
 
 
 if __name__ == "__main__":
-    print("Starting server...")
-    socketio.run(app, host="0.0.0.0", port=5000, debug=True)
+    import eventlet
+    import eventlet.wsgi
+    from flask_socketio import SocketIO
+
+    socketio.run(app, host="0.0.0.0", port=5000)
