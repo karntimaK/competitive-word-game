@@ -29,6 +29,7 @@ def on_find_match(data):
     username = data.get("username", "Anonymous")
     emit("status", {"message": "Searching for a match..."})
 
+    # เช็คว่าผู้เล่นอยู่ใน waiting list หรือยัง
     if any(p["sid"] == request.sid for p in waiting_players):
         emit("status", {"message": "Already waiting..."})
         return
@@ -42,6 +43,9 @@ def on_find_match(data):
         players = [p1, p2]
 
         game_instance = WordGame()  
+        secret = game_instance.start_new_game()
+        print(f"[DEBUG] Room {room_id} secret word: {secret}")
+
         rooms[room_id] = {
             "players": players,
             "guesses": {p1["sid"]: [], p2["sid"]: []},
@@ -56,7 +60,6 @@ def on_find_match(data):
             )
 
 
-
 @socketio.on("submit_guess")
 def on_submit_guess(data):
     room_id = data.get("room")
@@ -67,6 +70,12 @@ def on_submit_guess(data):
         return
 
     game_instance = rooms[room_id]["game"]
+
+    # ตรวจสอบว่า guess อยู่ใน dictionary
+    if not game_instance.validate_guess(guess):
+        emit("invalid_word", {"word": guess}, room=request.sid)
+        return
+
     feedback = game_instance.check_guess(guess)
 
     # เก็บคำและ feedback
@@ -92,7 +101,6 @@ def on_submit_guess(data):
 
     # 2. ฝ่ายตรงข้ามหมด 6 รอบและเดาไม่ถูก
     if opponent_sid and len(rooms[room_id]["guesses"][opponent_sid]) >= 6:
-        # ตรวจว่ามี guess ถูกหรือไม่
         correct_guesses = [g for g in rooms[room_id]["guesses"][opponent_sid] if g["word"] == game_instance.secret_word]
         if not correct_guesses:
             emit("game_result", {"result": "win"}, room=request.sid)

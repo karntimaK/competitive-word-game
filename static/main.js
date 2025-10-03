@@ -148,6 +148,11 @@ document.addEventListener("DOMContentLoaded", () => {
   socket.on("status", (data) => {
     if (data.message) updateStatus(data.message);
   });
+  
+  socket.on("invalid_word", data => {
+    alert(`"${data.word}" is not in the dictionary`);
+  });
+
 
   // game result
   // กลับไปหน้าหาห้อง พร้อมแสดงผล
