@@ -17,7 +17,8 @@ competitive-word-game/
 │   │   └── app.py
 │   └── game_core/
 │       ├── core_logic.py
-│       └── dictionary.py
+│       ├── dictionary.py
+│       └── words.txt
 ├── tests/
 │   ├── test_logic.py
 │   └── test_api.py
