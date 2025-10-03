@@ -1,7 +1,8 @@
 from flask import Flask, request, send_from_directory
-from flask_socketio import SocketIO, emit, join_room, leave_room
+from flask_socketio import SocketIO, emit, join_room
 import uuid
 import os
+from game_core.core_logic import WordGame
 
 app = Flask(__name__, static_folder="../../static", template_folder="../../client")
 socketio = SocketIO(app, cors_allowed_origins="*")
@@ -26,7 +27,7 @@ def on_find_match(data):
     emit("status", {"message": "Searching for a match..."})
 
     if any(p["sid"] == request.sid for p in waiting_players):
-        emit("status", {"message": "Already waiting for opponent..."})
+        emit("status", {"message": "Already waiting..."})
         return
 
     waiting_players.append({"sid": request.sid, "username": username})
@@ -36,9 +37,13 @@ def on_find_match(data):
         p2 = waiting_players.pop(0)
         room_id = str(uuid.uuid4())[:8]
         players = [p1, p2]
+
+        # สร้าง WordGame instance สำหรับห้องนี้
+        game_instance = WordGame()  # ใช้ mock secret_word
         rooms[room_id] = {
             "players": players,
-            "guesses": {p1["sid"]: [], p2["sid"]: []}  # เก็บคำของแต่ละคน
+            "guesses": {p1["sid"]: [], p2["sid"]: []},
+            "game": game_instance
         }
 
         for p in players:
@@ -59,18 +64,21 @@ def on_submit_guess(data):
         emit("status", {"message": "Room not found"})
         return
 
-    # บันทึกคำเดาใน game state
-    rooms[room_id]["guesses"][request.sid].append(guess)
+    # ตรวจคำด้วย core_logic
+    game_instance = rooms[room_id]["game"]
+    feedback = game_instance.check_guess(guess)
 
-    # ส่งกลับให้ผู้เล่นอัพเดตตาราง (placeholder สี GREY)
-    emit("update_board", {"guess": guess}, room=request.sid)
+    # เก็บคำเดาและ feedback
+    rooms[room_id]["guesses"][request.sid].append({"word": guess, "feedback": feedback})
 
-@socketio.on('disconnect')
-def on_disconnect():
-    print("A user disconnected:", request.sid)
-    global waiting_players
-    waiting_players = [p for p in waiting_players if p["sid"] != request.sid]
-    # TODO: handle disconnect กลางห้อง
+    # ส่ง feedback สีไปอัพเดตตารางผู้เล่นตัวเอง
+    emit("update_board", {"guess": guess, "feedback": feedback}, room=request.sid)
+
+    # ส่ง feedback ไปอัพเดตมุมเล็กของฝ่ายตรงข้าม
+    for player in rooms[room_id]["players"]:
+        if player["sid"] != request.sid:
+            emit("update_opponent_board", {"feedback": feedback}, room=player["sid"])
 
 if __name__ == "__main__":
+    print("Starting server...")
     socketio.run(app, host="0.0.0.0", port=5000, debug=True)
