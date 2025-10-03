@@ -2,6 +2,8 @@ from flask import Flask, request, send_from_directory
 from flask_socketio import SocketIO, emit, join_room
 import uuid
 import os
+import sys
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from game_core.core_logic import WordGame
 
 app = Flask(__name__, static_folder="../../static", template_folder="../../client")
