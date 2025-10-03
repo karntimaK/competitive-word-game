@@ -13,13 +13,16 @@ rooms = {}
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CLIENT_DIR = os.path.join(BASE_DIR, "../../client")
 
+
 @app.route("/")
 def index():
     return send_from_directory(CLIENT_DIR, "index.html")
 
+
 @socketio.on("connect")
 def on_connect(auth):
     print("A user connected:", request.sid)
+
 
 @socketio.on('find_match')
 def on_find_match(data):
@@ -38,8 +41,7 @@ def on_find_match(data):
         room_id = str(uuid.uuid4())[:8]
         players = [p1, p2]
 
-        # สร้าง WordGame instance สำหรับห้องนี้
-        game_instance = WordGame()  # ใช้ mock secret_word
+        game_instance = WordGame()  
         rooms[room_id] = {
             "players": players,
             "guesses": {p1["sid"]: [], p2["sid"]: []},
@@ -47,13 +49,13 @@ def on_find_match(data):
         }
 
         for p in players:
-            join_room(room_id, sid=p["sid"])
+            emit(
+                "matched",
+                {"room": room_id, "players": [pl["username"] for pl in players]},
+                to=p["sid"]
+            )
 
-        socketio.emit(
-            "matched",
-            {"room": room_id, "players": [pl["username"] for pl in players]},
-            room=room_id
-        )
+
 
 @socketio.on("submit_guess")
 def on_submit_guess(data):
@@ -64,20 +66,38 @@ def on_submit_guess(data):
         emit("status", {"message": "Room not found"})
         return
 
-    # ตรวจคำด้วย core_logic
     game_instance = rooms[room_id]["game"]
     feedback = game_instance.check_guess(guess)
 
-    # เก็บคำเดาและ feedback
+    # เก็บคำและ feedback
     rooms[room_id]["guesses"][request.sid].append({"word": guess, "feedback": feedback})
 
-    # ส่ง feedback สีไปอัพเดตตารางผู้เล่นตัวเอง
+    # ส่งให้ผู้เล่นตัวเอง
     emit("update_board", {"guess": guess, "feedback": feedback}, room=request.sid)
 
-    # ส่ง feedback ไปอัพเดตมุมเล็กของฝ่ายตรงข้าม
-    for player in rooms[room_id]["players"]:
-        if player["sid"] != request.sid:
-            emit("update_opponent_board", {"feedback": feedback}, room=player["sid"])
+    # ส่งให้คู่ต่อสู้ → แค่ feedback
+    opponent_sid = None
+    for p in rooms[room_id]["players"]:
+        if p["sid"] != request.sid:
+            opponent_sid = p["sid"]
+            emit("update_opponent_board", {"feedback": feedback}, room=opponent_sid)
+
+    # ตรวจเงื่อนไขชนะ
+    # 1. ผู้เล่นตัวเองใส่คำถูกต้อง
+    if guess == game_instance.secret_word:
+        emit("game_result", {"result": "win"}, room=request.sid)
+        if opponent_sid:
+            emit("game_result", {"result": "lose"}, room=opponent_sid)
+        return
+
+    # 2. ฝ่ายตรงข้ามหมด 6 รอบและเดาไม่ถูก
+    if opponent_sid and len(rooms[room_id]["guesses"][opponent_sid]) >= 6:
+        # ตรวจว่ามี guess ถูกหรือไม่
+        correct_guesses = [g for g in rooms[room_id]["guesses"][opponent_sid] if g["word"] == game_instance.secret_word]
+        if not correct_guesses:
+            emit("game_result", {"result": "win"}, room=request.sid)
+            emit("game_result", {"result": "lose"}, room=opponent_sid)
+
 
 if __name__ == "__main__":
     print("Starting server...")
