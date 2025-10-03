@@ -1,96 +1,111 @@
 const socket = io("http://localhost:5000");
 
-let myUsername = "";
-let opponentUsername = "";
+let roomId = null;
+let playerName = "";
+let opponentName = "";
 
+// connect
 socket.on("connect", () => {
   console.log("Connected to server");
   document.getElementById("status").innerText = "Connected to server.";
 });
 
+// find match
 function findMatch() {
-  myUsername = document.getElementById("username").value || "Anonymous";
-  socket.emit("find_match", { username: myUsername });
+  playerName = document.getElementById("username").value || "Anonymous";
+  socket.emit("find_match", { username: playerName });
   document.getElementById("status").innerText = "Finding a match...";
 }
 
-socket.on("status", (data) => {
-  document.getElementById("status").innerText = data.message;
-});
-
+// matched
 socket.on("matched", (data) => {
-  // ซ่อนหน้า lobby / input username
-  document.getElementById("lobby").style.display = "none";
-  // แสดงหน้าเกม
-  document.getElementById("game").style.display = "block";
+  roomId = data.room;
+  const players = data.players;
+  opponentName = players.find(name => name !== playerName);
 
-  // แก้ชื่อ player / opponent ให้ตรง
-  if (data.players[0] === myUsername) {
-    opponentUsername = data.players[1];
-  } else {
-    opponentUsername = data.players[0];
-  }
+  document.body.innerHTML = `
+    <h2>Competitive Word Game</h2>
+    <div>Player: ${playerName}</div>
+    <div>Opponent: ${opponentName}</div>
 
-  document.getElementById("player-name").innerText = myUsername;
-  document.getElementById("opponent-name").innerText = opponentUsername;
+    <div id="board">
+      <table id="player_board"></table>
+      <div>
+        <input type="text" id="guess_input" maxlength="5">
+        <button onclick="submitGuess()">Submit</button>
+      </div>
+    </div>
 
-  // สร้างตาราง placeholder
-  generatePlayerTable();
-  generateOpponentTable();
+    <div id="opponent_board">
+      <h4>Opponent</h4>
+      <table id="opponent_table"></table>
+    </div>
+  `;
+
+  createBoard("player_board");
+  createBoard("opponent_table", true);
 });
 
-function generatePlayerTable() {
-  const table = document.getElementById("player-table");
-  table.innerHTML = ""; // reset
-  for (let i = 0; i < 6; i++) {
+// create 6x5 table
+function createBoard(tableId, isOpponent=false) {
+  const table = document.getElementById(tableId);
+  table.innerHTML = "";
+  for (let r = 0; r < 6; r++) {
     const tr = document.createElement("tr");
-    for (let j = 0; j < 5; j++) {
+    for (let c = 0; c < 5; c++) {
       const td = document.createElement("td");
+      td.style.border = "1px solid #000";
       td.style.width = "30px";
       td.style.height = "30px";
-      td.style.border = "1px solid #000";
       td.style.textAlign = "center";
-      td.style.backgroundColor = "#fff"; // placeholder สี
-      td.innerText = ""; // ยังไม่เชื่อม logic
+      td.style.verticalAlign = "middle";
+      td.style.backgroundColor = isOpponent ? "#ddd" : "#fff";
+      td.innerText = "";
       tr.appendChild(td);
     }
     table.appendChild(tr);
   }
 }
 
-function generateOpponentTable() {
-  const table = document.getElementById("opponent-table");
-  table.innerHTML = ""; // reset
-  for (let i = 0; i < 6; i++) {
-    const tr = document.createElement("tr");
-    for (let j = 0; j < 5; j++) {
-      const td = document.createElement("td");
-      td.style.width = "15px";
-      td.style.height = "15px";
-      td.style.border = "1px solid #000";
-      td.style.textAlign = "center";
-      td.style.backgroundColor = "#ccc"; // placeholder สี opponent
-      tr.appendChild(td);
-    }
-    table.appendChild(tr);
-  }
-}
-
+// submit guess
 function submitGuess() {
-  const input = document.getElementById("guess-input").value.toUpperCase();
-  if (!input) return;
-  console.log("Submitted guess:", input);
-  document.getElementById("guess-input").value = "";
+  const input = document.getElementById("guess_input");
+  const guess = input.value.toUpperCase();
+  if (!guess || guess.length !== 5) {
+    alert("Enter a 5-letter word");
+    return;
+  }
 
-  const table = document.getElementById("player-table");
-  for (let row of table.rows) {
-    for (let cell of row.cells) {
-      if (cell.innerText === "") {
-        for (let i = 0; i < 5; i++) {
-          cell.innerText = input[i] || "";
-        }
-        return;
-      }
+  // ส่งไป server
+  socket.emit("submit_guess", { room: roomId, guess: guess });
+
+  input.value = "";
+}
+
+// รับ update จาก server → update ตารางผู้เล่นตัวเอง
+socket.on("update_board", (data) => {
+  const guess = data.guess;
+  const table = document.getElementById("player_board");
+
+  // วางคำในแถวถัดไป
+  const rowIndex = table.rows.length - 6 + roomsGuessLength(table); // row ถัดไป
+  const row = table.rows[rowIndex];
+
+  if (row) {
+    for (let i = 0; i < 5; i++) {
+      const cell = row.cells[i];
+      cell.innerText = guess[i];
+      cell.style.backgroundColor = "#ccc"; // placeholder สีเทา
     }
   }
+});
+
+// helper: นับคำเดาที่มีใน table
+function roomsGuessLength(table) {
+  let count = 0;
+  for (let r = 0; r < 6; r++) {
+    let rowEmpty = table.rows[r].cells[0].innerText === "";
+    if (!rowEmpty) count++;
+  }
+  return count;
 }
