@@ -16,12 +16,15 @@ document.addEventListener("DOMContentLoaded", () => {
   appRoot.appendChild(statusDiv);
 
   function updateStatus(message) {
+    // ล้าง class สีเก่าออกก่อนอัปเดตข้อความสถานะปกติ
+    statusDiv.className = "";
     statusDiv.innerText = message || "";
   }
 
   function renderLobby() {
-    appRoot.innerHTML = ""; 
+    appRoot.innerHTML = "";
     appRoot.appendChild(statusDiv);
+    updateStatus(""); // เคลียร์สถานะเมื่อกลับมาที่ล็อบบี้
 
     const title = document.createElement("h2");
     title.innerText = "Competitive Word Game";
@@ -32,7 +35,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const input = document.createElement("input");
     input.id = "username";
+    input.type = "text";
     input.placeholder = "Enter your name";
+
 
     const findBtn = document.createElement("button");
     findBtn.id = "find_btn";
@@ -61,11 +66,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const joinContainer = document.createElement("div");
     joinContainer.id = "join_container";
-
     joinContainer.style.display = "none";
 
     const joinInput = document.createElement("input");
     joinInput.id = "join_code_input";
+    joinInput.type = "text";
     joinInput.placeholder = "6-digit code";
 
     const joinSend = document.createElement("button");
@@ -103,11 +108,9 @@ document.addEventListener("DOMContentLoaded", () => {
   socket.on("connect", () => updateStatus("Connected to server"));
 
   socket.on("room_created", (data) => {
-
     roomId = data.room;
     const code = data.code;
     updateStatus(`Room created. Share code: ${code}. Waiting for opponent...`);
-
     renderWaitingRoom(code);
   });
 
@@ -120,7 +123,6 @@ document.addEventListener("DOMContentLoaded", () => {
     roomId = data.room;
     const players = data.players;
     opponentName = players.find(name => name !== playerName) || "Opponent";
-
     renderGameUI();
     updateStatus(`Matched with ${opponentName}`);
   });
@@ -142,88 +144,87 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
+  /**
+   * ============== 🎯 ส่วนที่แก้ไข 🎯 ==============
+   * แก้ไขการแสดงผลลัพธ์ของเกม
+   */
   socket.on("game_result", (data) => {
-
     const input = document.getElementById("guess_input");
     const submit = document.getElementById("submit_btn");
     if (input) input.disabled = true;
     if (submit) submit.disabled = true;
 
     let msg = "";
-    if (data.result === "win") msg = "You win!";
-    else if (data.result === "lose") msg = "You lose!";
+    if (data.result === "win") msg = "🎇🎇🥳You win🎇🥳🙌";
+    else if (data.result === "lose") msg = "🥀🥀😭You lose😭😭💔";
     if (data.reason === "time_expired" || data.reason === "timeout") msg = "Time's up — both lose!";
     if (data.reason === "turns_exhausted") msg += " (turns exhausted)";
     if (data.reason === "opponent_disconnected") msg = "Opponent disconnected — You win!";
 
-    const resultDiv = document.getElementById("result_area") || document.createElement("div");
-    resultDiv.id = "result_area";
-    resultDiv.style.marginTop = "10px";
-    resultDiv.style.fontWeight = "bold";
-    resultDiv.innerText = msg;
-
+    // --- ย้ายการแสดงผลลัพธ์ไปที่ statusDiv ด้านบน ---
+    statusDiv.innerText = msg;
+    statusDiv.className = ""; // เคลียร์ class เก่า
+    if (data.result === "win" || data.reason === "opponent_disconnected") {
+        statusDiv.classList.add("status-win");
+    } else {
+        statusDiv.classList.add("status-lose");
+    }
+    
+    // --- สร้างปุ่มกลับล็อบบี้ ---
     const backBtn = document.createElement("button");
     backBtn.id = "back_lobby_btn";
     backBtn.innerText = "Back to Lobby";
-    backBtn.style.marginLeft = "10px";
+    backBtn.style.marginTop = "16px";
     backBtn.addEventListener("click", () => {
-
       socket.emit("leave_room", {});
-
       renderLobby();
-      updateStatus("");
       roomId = null;
       playerGuessCount = 0;
       opponentGuessCount = 0;
     });
 
-    const boardWrapper = document.getElementById("board_wrapper");
-    if (boardWrapper) {
-
-      const existing = document.getElementById("result_area");
-      if (existing) existing.remove();
-      boardWrapper.appendChild(resultDiv);
-      boardWrapper.appendChild(backBtn);
+    // --- เพิ่มปุ่มไว้ใต้กระดานของผู้เล่น ---
+    const playerColumn = document.getElementById("player_column");
+    if (playerColumn) {
+        playerColumn.appendChild(backBtn);
     } else {
-      alert(msg);
-      renderLobby();
+      // กรณีฉุกเฉิน หากหา playerColumn ไม่เจอ
+      const boardWrapper = document.getElementById("board_wrapper");
+      if (boardWrapper) {
+          boardWrapper.appendChild(backBtn);
+      } else {
+          alert(msg);
+          renderLobby();
+      }
     }
   });
-
+  
   socket.on("player_disconnected", (data) => {
     updateStatus(data.message || "Opponent disconnected");
-  });
-
-  socket.on("join_failed", (data) => {
-    updateStatus(data.message || "Join failed");
-  });
-
-  socket.on("room_created", (data) => {
-
   });
 
   function renderWaitingRoom(code) {
     appRoot.innerHTML = "";
     appRoot.appendChild(statusDiv);
-
     const title = document.createElement("h2");
     title.innerText = "Private Room Created";
     appRoot.appendChild(title);
-
     const codeDiv = document.createElement("div");
     codeDiv.innerHTML = `<strong>Room code:</strong> ${code} <br/>Share with your friend to join.`;
     appRoot.appendChild(codeDiv);
-
     const cancelBtn = document.createElement("button");
     cancelBtn.innerText = "Cancel and Back";
     cancelBtn.addEventListener("click", () => {
-
       socket.emit("leave_room", {});
       renderLobby();
     });
     appRoot.appendChild(cancelBtn);
   }
-
+  
+  /**
+   * ============== 🎯 ส่วนที่แก้ไข 🎯 ==============
+   * ลบแถวแสดงชื่อ Player/Opponent ออก
+   */
   function renderGameUI() {
     appRoot.innerHTML = "";
     appRoot.appendChild(statusDiv);
@@ -232,10 +233,7 @@ document.addEventListener("DOMContentLoaded", () => {
     title.innerText = "Competitive Word Game";
     appRoot.appendChild(title);
 
-    const playersRow = document.createElement("div");
-    playersRow.innerHTML = `<div>Player: ${playerName}</div><div>Opponent: ${opponentName}</div>`;
-    playersRow.style.marginBottom = "8px";
-    appRoot.appendChild(playersRow);
+    // --- [ลบออก] แถวแสดงชื่อ Player และ Opponent ---
 
     const timerDiv = document.createElement("div");
     timerDiv.id = "timer";
@@ -245,17 +243,24 @@ document.addEventListener("DOMContentLoaded", () => {
     const boardWrapper = document.createElement("div");
     boardWrapper.id = "board_wrapper";
 
+    const playerColumn = document.createElement("div");
+    playerColumn.id = "player_column";
+
     const playerBoard = document.createElement("table");
     playerBoard.id = "player_board";
-    playerBoard.style.borderCollapse = "collapse";
-    boardWrapper.appendChild(playerBoard);
-
+    
     const inputRow = document.createElement("div");
-    inputRow.style.marginTop = "8px";
+    inputRow.style.marginTop = "16px";
+    inputRow.style.display = "flex";
+    inputRow.style.gap = "8px";
+
     const guessInput = document.createElement("input");
     guessInput.id = "guess_input";
+    guessInput.type = "text";
     guessInput.maxLength = 5;
     guessInput.placeholder = "Type guess";
+    guessInput.style.flex = "1";
+
     const submitBtn = document.createElement("button");
     submitBtn.id = "submit_btn";
     submitBtn.innerText = "Submit";
@@ -263,19 +268,27 @@ document.addEventListener("DOMContentLoaded", () => {
 
     inputRow.appendChild(guessInput);
     inputRow.appendChild(submitBtn);
-    boardWrapper.appendChild(inputRow);
 
+    playerColumn.appendChild(playerBoard);
+    playerColumn.appendChild(inputRow);
+
+    // --- ส่วนของคู่ต่อสู้ ---
     const oppWrap = document.createElement("div");
-    oppWrap.style.marginTop = "12px";
     const oppTitle = document.createElement("h4");
-    oppTitle.innerText = "Opponent";
-    oppWrap.appendChild(oppTitle);
+    // --- [แก้ไข] เปลี่ยน Title ของกระดานเป็นชื่อ Opponent ---
+    oppTitle.innerText = `${opponentName}'s Board`; 
+    oppTitle.style.marginLeft = "15px";
+
     const oppTable = document.createElement("table");
     oppTable.id = "opponent_table";
+    
+    oppWrap.appendChild(oppTitle);
     oppWrap.appendChild(oppTable);
 
+    boardWrapper.appendChild(playerColumn);
+    boardWrapper.appendChild(oppWrap);
+
     appRoot.appendChild(boardWrapper);
-    appRoot.appendChild(oppWrap);
 
     createBoard("player_board");
     createBoard("opponent_table", true);
@@ -291,19 +304,16 @@ document.addEventListener("DOMContentLoaded", () => {
       const tr = document.createElement("tr");
       for (let c = 0; c < 5; c++) {
         const td = document.createElement("td");
-        td.style.border = "1px solid #000";
-        td.style.width = "36px";
-        td.style.height = "36px";
-        td.style.textAlign = "center";
-        td.style.verticalAlign = "middle";
-        td.style.backgroundColor = isOpponent ? "#eee" : "#fff";
-        td.style.margin = "2px";
         tr.appendChild(td);
       }
       table.appendChild(tr);
     }
   }
 
+  /**
+   * ============== 🎯 ส่วนที่แก้ไข 🎯 ==============
+   * ลบการอัปเดตสถานะ "Submitting guess" ออก
+   */
   function submitGuess() {
     const input = document.getElementById("guess_input");
     const guess = (input && input.value) ? input.value.toUpperCase().trim() : "";
@@ -315,7 +325,7 @@ document.addEventListener("DOMContentLoaded", () => {
       updateStatus("You are not in a room yet.");
       return;
     }
-    updateStatus(`Submitting guess: ${guess}`);
+    // --- [ลบออก] บรรทัดอัปเดตสถานะตอนส่งคำตอบ ---
     socket.emit("submit_guess", { room: roomId, guess: guess });
     if (input) input.value = "";
   }
@@ -329,9 +339,9 @@ document.addEventListener("DOMContentLoaded", () => {
       for (let i = 0; i < 5; i++) {
         const cell = row.cells[i];
         cell.innerText = guess[i];
-        if (feedback[i] === "G") cell.style.backgroundColor = "green";
-        else if (feedback[i] === "Y") cell.style.backgroundColor = "yellow";
-        else cell.style.backgroundColor = "#ccc";
+        if (feedback[i] === "G") cell.className = "green";
+        else if (feedback[i] === "Y") cell.className = "yellow";
+        else cell.className = "gray";
       }
     }
     playerGuessCount++;
@@ -342,11 +352,11 @@ document.addEventListener("DOMContentLoaded", () => {
     const table = document.getElementById("opponent_table");
     const row = table.rows[opponentGuessCount];
     if (row) {
-      for (let i = 0; i < 5; i++) {
+      for (let i = d = 0; i < 5; i++) {
         const cell = row.cells[i];
-        if (feedback[i] === "G") cell.style.backgroundColor = "green";
-        else if (feedback[i] === "Y") cell.style.backgroundColor = "yellow";
-        else cell.style.backgroundColor = "#aaa";
+        if (feedback[i] === "G") cell.className = "green";
+        else if (feedback[i] === "Y") cell.className = "yellow";
+        else cell.className = "gray";
       }
     }
     opponentGuessCount++;
