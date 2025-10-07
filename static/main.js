@@ -32,7 +32,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const input = document.createElement("input");
     input.id = "username";
+    input.type = "text";
     input.placeholder = "Enter your name";
+
 
     const findBtn = document.createElement("button");
     findBtn.id = "find_btn";
@@ -245,11 +247,16 @@ document.addEventListener("DOMContentLoaded", () => {
     const boardWrapper = document.createElement("div");
     boardWrapper.id = "board_wrapper";
 
+    // --- ส่วนที่แก้ไข ---
+    // 1. สร้าง Div ใหม่เพื่อจัดกลุ่มกระดานและช่องพิมพ์
+    const playerColumn = document.createElement("div");
+    playerColumn.id = "player_column"; // ตั้งชื่อเพื่อความชัดเจน
+
+    // 2. ย้ายโค้ดสร้างกระดานมาไว้นี่
     const playerBoard = document.createElement("table");
     playerBoard.id = "player_board";
-    playerBoard.style.borderCollapse = "collapse";
-    boardWrapper.appendChild(playerBoard);
 
+    // 3. ย้ายโค้ดสร้างช่องพิมพ์และปุ่มมาไว้นี่
     const inputRow = document.createElement("div");
     inputRow.style.marginTop = "8px";
     const guessInput = document.createElement("input");
@@ -263,7 +270,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
     inputRow.appendChild(guessInput);
     inputRow.appendChild(submitBtn);
-    boardWrapper.appendChild(inputRow);
+
+    // 4. นำกระดานและช่องพิมพ์ใส่เข้าไปใน Div ใหม่ (playerColumn)
+    playerColumn.appendChild(playerBoard);
+    playerColumn.appendChild(inputRow);
+
+    // 5. นำ Div ใหม่ (playerColumn) ไปใส่ใน boardWrapper
+    boardWrapper.appendChild(playerColumn);
 
     const oppWrap = document.createElement("div");
     oppWrap.style.marginTop = "12px";
@@ -291,13 +304,6 @@ document.addEventListener("DOMContentLoaded", () => {
       const tr = document.createElement("tr");
       for (let c = 0; c < 5; c++) {
         const td = document.createElement("td");
-        td.style.border = "1px solid #000";
-        td.style.width = "36px";
-        td.style.height = "36px";
-        td.style.textAlign = "center";
-        td.style.verticalAlign = "middle";
-        td.style.backgroundColor = isOpponent ? "#eee" : "#fff";
-        td.style.margin = "2px";
         tr.appendChild(td);
       }
       table.appendChild(tr);
@@ -329,14 +335,16 @@ document.addEventListener("DOMContentLoaded", () => {
       for (let i = 0; i < 5; i++) {
         const cell = row.cells[i];
         cell.innerText = guess[i];
-        if (feedback[i] === "G") cell.style.backgroundColor = "green";
-        else if (feedback[i] === "Y") cell.style.backgroundColor = "yellow";
-        else cell.style.backgroundColor = "#ccc";
+        // เปลี่ยนจากการกำหนดสีตรงๆ เป็นการใช้คลาสจาก css
+        if (feedback[i] === "G") cell.className = "green";
+        else if (feedback[i] === "Y") cell.className = "yellow";
+        else cell.className = "gray";
       }
     }
     playerGuessCount++;
-  });
+});
 
+  // แก้ไขส่วนนี้
   socket.on("update_opponent_board", (data) => {
     const feedback = data.feedback;
     const table = document.getElementById("opponent_table");
@@ -344,12 +352,13 @@ document.addEventListener("DOMContentLoaded", () => {
     if (row) {
       for (let i = 0; i < 5; i++) {
         const cell = row.cells[i];
-        if (feedback[i] === "G") cell.style.backgroundColor = "green";
-        else if (feedback[i] === "Y") cell.style.backgroundColor = "yellow";
-        else cell.style.backgroundColor = "#aaa";
+        // เปลี่ยนจากการกำหนดสีตรงๆ เป็นการใช้คลาสจาก css
+        if (feedback[i] === "G") cell.className = "green";
+        else if (feedback[i] === "Y") cell.className = "yellow";
+        else cell.className = "gray";
       }
     }
     opponentGuessCount++;
-  });
+});
 
 });
