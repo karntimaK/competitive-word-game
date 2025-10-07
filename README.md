@@ -25,6 +25,7 @@ competitive-word-game/
 ├── client/
 │   └── index.html
 ├── static/
+│   ├── styles.css
 │   └── main.js
 ├── requirements.txt
 └── README.md
