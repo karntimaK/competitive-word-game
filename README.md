@@ -19,6 +19,9 @@ competitive-word-game/
 │       ├── core_logic.py
 │       ├── dictionary.py
 │       └── words.txt
+├── tests/
+│   ├── test_logic.py
+│   └── test_api.py
 ├── client/
 │   └── index.html
 ├── static/
