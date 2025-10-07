@@ -7,9 +7,6 @@ document.addEventListener("DOMContentLoaded", () => {
   let playerGuessCount = 0;
   let opponentGuessCount = 0;
 
-  let timerInterval = null;
-
-  // สร้าง div สำหรับแสดง status message
   let statusDiv = document.createElement("div");
   statusDiv.id = "status_message";
   document.body.appendChild(statusDiv);
@@ -18,39 +15,33 @@ document.addEventListener("DOMContentLoaded", () => {
     statusDiv.innerText = message;
   }
 
-  // สถานะเชื่อมต่อ server
-  socket.on("connect", () => {
-    updateStatus("Connected to server");
-  });
+  socket.on("connect", () => updateStatus("Connected to server"));
 
-  // find match
   window.findMatch = function() {
     playerName = document.getElementById("username").value || "Anonymous";
     const resultDiv = document.getElementById("result_message");
-    if(resultDiv) resultDiv.innerText = ""; // เคลียร์ข้อความเดิม
+    if(resultDiv) resultDiv.innerText = "";
     updateStatus("Finding match...");
     socket.emit("find_match", { username: playerName });
   };
 
-  // matched
   socket.on("matched", (data) => {
     roomId = data.room;
     const players = data.players;
     opponentName = players.find(name => name !== playerName);
 
-    updateStatus(`Matched with ${opponentName}!`);
-
     document.body.innerHTML = `
       <h2>Competitive Word Game</h2>
       <div>Player: ${playerName}</div>
       <div>Opponent: ${opponentName}</div>
-      <div>Time Remaining: <span id="timer">5:00</span></div>
+
+      <div id="timer">Time left: 5:00</div>
 
       <div id="board">
         <table id="player_board"></table>
         <div style="margin-top:5px;">
           <input type="text" id="guess_input" maxlength="5">
-          <button onclick="submitGuess()">Submit</button>
+          <button id="submit_btn">Submit</button>
         </div>
       </div>
 
@@ -62,9 +53,9 @@ document.addEventListener("DOMContentLoaded", () => {
       <div id="status_message"></div>
     `;
 
+    document.getElementById("submit_btn").addEventListener("click", submitGuess);
     createBoard("player_board");
     createBoard("opponent_table", true);
-
     playerGuessCount = 0;
     opponentGuessCount = 0;
   });
@@ -82,7 +73,6 @@ document.addEventListener("DOMContentLoaded", () => {
         td.style.textAlign = "center";
         td.style.verticalAlign = "middle";
         td.style.backgroundColor = isOpponent ? "#eee" : "#fff";
-        td.innerText = "";
         tr.appendChild(td);
       }
       table.appendChild(tr);
@@ -92,88 +82,69 @@ document.addEventListener("DOMContentLoaded", () => {
   window.submitGuess = function() {
     const input = document.getElementById("guess_input");
     const guess = input.value.toUpperCase();
-    if (!guess || guess.length !== 5) {
-      alert("Enter a 5-letter word");
-      return;
-    }
-    if (!roomId) {
-      updateStatus("You are not in a room yet.");
-      return;
-    }
+    if (!guess || guess.length !== 5) { alert("Enter a 5-letter word"); return; }
+    if (!roomId) { updateStatus("You are not in a room yet."); return; }
     updateStatus(`Submitting guess: ${guess}`);
     socket.emit("submit_guess", { room: roomId, guess: guess });
     input.value = "";
   };
 
   socket.on("update_board", (data) => {
-    const guess = data.guess;
-    const feedback = data.feedback;
     const table = document.getElementById("player_board");
-    const rowIndex = playerGuessCount;
-    const row = table.rows[rowIndex];
-
+    const row = table.rows[playerGuessCount];
     if (row) {
       for (let i = 0; i < 5; i++) {
-        const cell = row.cells[i];
-        cell.innerText = guess[i];
-        if (feedback[i] === "G") cell.style.backgroundColor = "green";
-        else if (feedback[i] === "Y") cell.style.backgroundColor = "yellow";
-        else cell.style.backgroundColor = "#ccc"; // GREY
+        row.cells[i].innerText = data.guess[i];
+        row.cells[i].style.backgroundColor = data.feedback[i] === "G" ? "green"
+          : data.feedback[i] === "Y" ? "yellow" : "#ccc";
       }
     }
     playerGuessCount++;
   });
 
   socket.on("update_opponent_board", (data) => {
-    const feedback = data.feedback;
     const table = document.getElementById("opponent_table");
-    const rowIndex = opponentGuessCount;
-    const row = table.rows[rowIndex];
-
+    const row = table.rows[opponentGuessCount];
     if (row) {
       for (let i = 0; i < 5; i++) {
-        const cell = row.cells[i];
-        if (feedback[i] === "G") cell.style.backgroundColor = "green";
-        else if (feedback[i] === "Y") cell.style.backgroundColor = "yellow";
-        else cell.style.backgroundColor = "#aaa";
+        row.cells[i].style.backgroundColor = data.feedback[i] === "G" ? "green"
+          : data.feedback[i] === "Y" ? "yellow" : "#aaa";
       }
     }
     opponentGuessCount++;
   });
 
   socket.on("time_update", (data) => {
-    const timerEl = document.getElementById("timer");
-    if(timerEl) {
-      const minutes = Math.floor(data.seconds / 60);
-      const seconds = data.seconds % 60;
-      timerEl.innerText = `${minutes}:${seconds.toString().padStart(2,'0')}`;
-    }
+    const minutes = Math.floor(data.seconds / 60);
+    const seconds = data.seconds % 60;
+    const timerDiv = document.getElementById("timer");
+    if (timerDiv) timerDiv.innerText = `Time left: ${minutes}:${seconds.toString().padStart(2,'0')}`;
   });
 
-  socket.on("status", (data) => {
-    if (data.message) updateStatus(data.message);
-  });
-
-  socket.on("invalid_word", data => {
-    alert(`"${data.word}" is not in the dictionary`);
-  });
+  socket.on("status", (data) => { if (data.message) updateStatus(data.message); });
+  socket.on("invalid_word", data => { alert(`"${data.word}" is not in the dictionary`); });
 
   socket.on("game_result", (data) => {
-    let resultMessage = "";
-    if (data.result === "win") resultMessage = "You win!";
-    else if (data.result === "lose") resultMessage = "You lose!";
-    else if (data.result === "timeout") resultMessage = "Time's up — both lose!";
+    const inputField = document.getElementById("guess_input");
+    const submitBtn = document.getElementById("submit_btn");
+    if(inputField) inputField.disabled = true;
+    if(submitBtn) submitBtn.disabled = true;
+
+    let message = "";
+    if (data.result === "win") message = "You win!";
+    else if (data.result === "lose") message = "You lose!";
+
+    if(data.reason === "turns_exhausted") message += " (turns exhausted)";
 
     document.body.innerHTML = `
       <h2>Competitive Word Game</h2>
       <input type="text" id="username" placeholder="Enter your name">
       <button id="find_button">Find Match</button>
-      <div id="result_message" style="margin-top:10px; font-weight:bold;">${resultMessage}</div>
+      <div id="result_message" style="margin-top:10px; font-weight:bold;">${message}</div>
       <div id="status_message"></div>
     `;
+
     statusDiv = document.getElementById("status_message");
-    document.getElementById("find_button").addEventListener("click", () => {
-      findMatch();
-    });
+    document.getElementById("find_button").addEventListener("click", findMatch);
   });
 });
