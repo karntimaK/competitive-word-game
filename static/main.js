@@ -7,6 +7,8 @@ document.addEventListener("DOMContentLoaded", () => {
   let playerGuessCount = 0;
   let opponentGuessCount = 0;
 
+  let timerInterval = null;
+
   // สร้าง div สำหรับแสดง status message
   let statusDiv = document.createElement("div");
   statusDiv.id = "status_message";
@@ -23,13 +25,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // find match
   window.findMatch = function() {
-          playerName = document.getElementById("username").value || "Anonymous";
-          const resultDiv = document.getElementById("result_message");
-          if(resultDiv) resultDiv.innerText = ""; // เคลียร์ข้อความเดิม
-          updateStatus("Finding match...");
-          socket.emit("find_match", { username: playerName });
-        };
-
+    playerName = document.getElementById("username").value || "Anonymous";
+    const resultDiv = document.getElementById("result_message");
+    if(resultDiv) resultDiv.innerText = ""; // เคลียร์ข้อความเดิม
+    updateStatus("Finding match...");
+    socket.emit("find_match", { username: playerName });
+  };
 
   // matched
   socket.on("matched", (data) => {
@@ -43,6 +44,7 @@ document.addEventListener("DOMContentLoaded", () => {
       <h2>Competitive Word Game</h2>
       <div>Player: ${playerName}</div>
       <div>Opponent: ${opponentName}</div>
+      <div>Time Remaining: <span id="timer">5:00</span></div>
 
       <div id="board">
         <table id="player_board"></table>
@@ -63,12 +65,10 @@ document.addEventListener("DOMContentLoaded", () => {
     createBoard("player_board");
     createBoard("opponent_table", true);
 
-    // reset guess counts
     playerGuessCount = 0;
     opponentGuessCount = 0;
   });
 
-  // สร้างตาราง
   function createBoard(tableId, isOpponent=false) {
     const table = document.getElementById(tableId);
     table.innerHTML = "";
@@ -89,7 +89,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // submit guess
   window.submitGuess = function() {
     const input = document.getElementById("guess_input");
     const guess = input.value.toUpperCase();
@@ -106,7 +105,6 @@ document.addEventListener("DOMContentLoaded", () => {
     input.value = "";
   };
 
-  // update board player
   socket.on("update_board", (data) => {
     const guess = data.guess;
     const feedback = data.feedback;
@@ -126,7 +124,6 @@ document.addEventListener("DOMContentLoaded", () => {
     playerGuessCount++;
   });
 
-  // update opponent board (feedback สีเท่านั้น)
   socket.on("update_opponent_board", (data) => {
     const feedback = data.feedback;
     const table = document.getElementById("opponent_table");
@@ -144,37 +141,39 @@ document.addEventListener("DOMContentLoaded", () => {
     opponentGuessCount++;
   });
 
-  // status message update จาก server
+  socket.on("time_update", (data) => {
+    const timerEl = document.getElementById("timer");
+    if(timerEl) {
+      const minutes = Math.floor(data.seconds / 60);
+      const seconds = data.seconds % 60;
+      timerEl.innerText = `${minutes}:${seconds.toString().padStart(2,'0')}`;
+    }
+  });
+
   socket.on("status", (data) => {
     if (data.message) updateStatus(data.message);
   });
-  
+
   socket.on("invalid_word", data => {
     alert(`"${data.word}" is not in the dictionary`);
   });
 
+  socket.on("game_result", (data) => {
+    let resultMessage = "";
+    if (data.result === "win") resultMessage = "You win!";
+    else if (data.result === "lose") resultMessage = "You lose!";
+    else if (data.result === "timeout") resultMessage = "Time's up — both lose!";
 
-  // game result
-  // กลับไปหน้าหาห้อง พร้อมแสดงผล
-        socket.on("game_result", (data) => {
-          let resultMessage = "";
-          if (data.result === "win") resultMessage = "You win!";
-          else if (data.result === "lose") resultMessage = "You lose!";
-
-          document.body.innerHTML = `
-                <h2>Competitive Word Game</h2>
-                <input type="text" id="username" placeholder="Enter your name">
-                <button id="find_button">Find Match</button>
-                <div id="result_message" style="margin-top:10px; font-weight:bold;">${resultMessage}</div>
-                <div id="status_message"></div>
-          `;
-
-          // สร้าง reference ใหม่ให้ statusDiv
-          statusDiv = document.getElementById("status_message");
-
-          // attach event
-          document.getElementById("find_button").addEventListener("click", () => {
-                findMatch();
-          });
-        });
+    document.body.innerHTML = `
+      <h2>Competitive Word Game</h2>
+      <input type="text" id="username" placeholder="Enter your name">
+      <button id="find_button">Find Match</button>
+      <div id="result_message" style="margin-top:10px; font-weight:bold;">${resultMessage}</div>
+      <div id="status_message"></div>
+    `;
+    statusDiv = document.getElementById("status_message");
+    document.getElementById("find_button").addEventListener("click", () => {
+      findMatch();
+    });
+  });
 });
