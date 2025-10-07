@@ -3,10 +3,10 @@ from flask_socketio import SocketIO, emit
 import uuid
 import os
 import sys
+import time
 import eventlet
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
 from game_core.core_logic import WordGame
 
 app = Flask(__name__, static_folder="../../static", template_folder="../../client")
@@ -31,34 +31,27 @@ def on_disconnect():
     sid = request.sid
     print(f"[DISCONNECT] User disconnected: {sid}")
 
-    before_count = len(waiting_players)
-    waiting_players[:] = [p for p in waiting_players if p["sid"] != sid]
-    after_count = len(waiting_players)
-
-    if before_count != after_count:
-        print(f"[INFO] Removed {sid} from waiting list.")
-        return
+    global waiting_players
+    waiting_players = [p for p in waiting_players if p["sid"] != sid]
 
     room_to_remove = None
     opponent_sid = None
-
     for room_id, room_data in list(rooms.items()):
-        players = room_data["players"]
-        if any(p["sid"] == sid for p in players):
+        if any(p["sid"] == sid for p in room_data["players"]):
             room_to_remove = room_id
-
-            for p in players:
+            for p in room_data["players"]:
                 if p["sid"] != sid:
                     opponent_sid = p["sid"]
             break
 
     if room_to_remove:
-        print(f"[INFO] Player {sid} disconnected from room {room_to_remove}")
-
         if opponent_sid:
             emit("player_left", {"message": "Opponent disconnected."}, to=opponent_sid)
             emit("game_result", {"result": "win"}, to=opponent_sid)
 
+        timer_task = rooms[room_to_remove].get("timer_task")
+        if timer_task:
+            rooms[room_to_remove]["timer_cancelled"] = True
         del rooms[room_to_remove]
         print(f"[CLEANUP] Room {room_to_remove} removed after disconnect.")
 
@@ -86,8 +79,36 @@ def on_find_match(data):
         rooms[room_id] = {
             "players": players,
             "guesses": {p1["sid"]: [], p2["sid"]: []},
-            "game": game_instance
+            "game": game_instance,
+            "timer_cancelled": False
         }
+
+        def room_timer(rid):
+            total_seconds = 5 * 60
+            while total_seconds > 0:
+                # ถ้า room ถูกลบไปแล้ว (disconnect หรือจบเกม) → ออก
+                if rid not in rooms:
+                    print(f"[TIMER] Room {rid} no longer exists, stopping timer.")
+                    return
+
+                remaining = total_seconds
+                for p in rooms[rid]["players"]:
+                    socketio.emit("time_update", {"seconds": remaining}, to=p["sid"])
+                
+                eventlet.sleep(1)
+                total_seconds -= 1
+
+            # timeout → room ยังอยู่
+            if rid in rooms:
+                print(f"[TIMER] Room {rid} timed out, both lose.")
+                for p in rooms[rid]["players"]:
+                    socketio.emit("game_result", {"result": "timeout"}, to=p["sid"])
+                # ลบ room หลังหมดเวลา
+                del rooms[rid]
+                print(f"[TIMER] Room {rid} removed after timeout.")
+
+        timer_task = socketio.start_background_task(room_timer, room_id)
+        rooms[room_id]["timer_task"] = timer_task
 
         for p in players:
             emit(
@@ -95,8 +116,6 @@ def on_find_match(data):
                 {"room": room_id, "players": [pl["username"] for pl in players]},
                 to=p["sid"]
             )
-
-        print(f"[MATCHED] {p1['username']} vs {p2['username']} in room {room_id}")
 
 @socketio.on("submit_guess")
 def on_submit_guess(data):
@@ -116,7 +135,6 @@ def on_submit_guess(data):
         return
 
     feedback = game_instance.check_guess(guess)
-
     room_data["guesses"][sid].append({"word": guess, "feedback": feedback})
 
     emit("update_board", {"guess": guess, "feedback": feedback}, room=sid)
@@ -131,10 +149,8 @@ def on_submit_guess(data):
         emit("game_result", {"result": "win"}, room=sid)
         if opponent_sid:
             emit("game_result", {"result": "lose"}, room=opponent_sid)
-
-        if room_id in rooms:
-            del rooms[room_id]
-            print(f"[CLEANUP] Room {room_id} removed after win.")
+        room_data["timer_cancelled"] = True
+        del rooms[room_id]
         return
 
     if opponent_sid and len(room_data["guesses"][opponent_sid]) >= 6:
@@ -145,9 +161,8 @@ def on_submit_guess(data):
         if not correct_guesses:
             emit("game_result", {"result": "win"}, room=sid)
             emit("game_result", {"result": "lose"}, room=opponent_sid)
-            if room_id in rooms:
-                del rooms[room_id]
-                print(f"[CLEANUP] Room {room_id} removed after turns exhausted.")
+            room_data["timer_cancelled"] = True
+            del rooms[room_id]
 
 if __name__ == "__main__":
     print("Starting server...")
