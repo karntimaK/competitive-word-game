@@ -1,4 +1,4 @@
-## **README.md — Issue #1 (Full Version)**
+## **README.md**
 
 
 # Competitive Web-based Word Guessing Game
@@ -44,17 +44,22 @@ cd competitive-word-game
 
 ```bash
 python -m venv env
+```
+3. **Activate Virtual Environment**
+```bash
 source env/bin/activate   # Linux/Mac
+```
+```bash
 env\Scripts\activate      # Windows
 ```
 
-3. **Install Dependencies**
+4. **Install Dependencies**
 
 ```bash
 pip install -r requirements.txt
 ```
 
-4. **Run the Server**
+5. **Run the Server**
 
 ```bash
 python src/server/app.py
