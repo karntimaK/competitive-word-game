@@ -2,8 +2,14 @@
 
 ---
 
-Colab : [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1DxFdLIibwzhjiTtkV1wLJiPWEMSaa_k6?usp=sharing)
-https://files.catbox.moe/bcst24.mp4
+Colab : [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)]
+
+<p align="center">
+  <video src="https://files.catbox.moe/bcst24.mp4" controls width="700">
+    Your browser does not support the video tag.
+  </video>
+</p>
+
 
 # Competitive Web-based Word Guessing Game
 
