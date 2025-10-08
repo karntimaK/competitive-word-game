@@ -2,7 +2,10 @@
 
 ---
 
-Colab : [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)]
+Colab : ![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)
+
+Walkthrough Video :
+[![Watch Walkthrough Video](https://img.youtube.com/vi/wqhAo1ZTgiA/maxresdefault.jpg)](https://www.youtube.com/watch?v=wqhAo1ZTgiA)
 
 <p align="center">
   <video src="https://files.catbox.moe/bcst24.mp4" controls width="700">
