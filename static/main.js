@@ -16,7 +16,6 @@ document.addEventListener("DOMContentLoaded", () => {
   appRoot.appendChild(statusDiv);
 
   function updateStatus(message) {
-    // ล้าง class สีเก่าออกก่อนอัปเดตข้อความสถานะปกติ
     statusDiv.className = "";
     statusDiv.innerText = message || "";
   }
@@ -24,7 +23,7 @@ document.addEventListener("DOMContentLoaded", () => {
   function renderLobby() {
     appRoot.innerHTML = "";
     appRoot.appendChild(statusDiv);
-    updateStatus(""); // เคลียร์สถานะเมื่อกลับมาที่ล็อบบี้
+    updateStatus("");
 
     const title = document.createElement("h2");
     title.innerText = "Competitive Word Game";
@@ -37,7 +36,6 @@ document.addEventListener("DOMContentLoaded", () => {
     input.id = "username";
     input.type = "text";
     input.placeholder = "Enter your name";
-
 
     const findBtn = document.createElement("button");
     findBtn.id = "find_btn";
@@ -121,8 +119,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
   socket.on("matched", (data) => {
     roomId = data.room;
-    const players = data.players;
-    opponentName = players.find(name => name !== playerName) || "Opponent";
+    const players = data.players; 
+
+    const me = players.find(p => p.sid === socket.id);
+    const opponent = players.find(p => p.sid !== socket.id);
+
+    playerName = me ? me.username : "You";
+    opponentName = opponent ? opponent.username : "Opponent";
+
     renderGameUI();
     updateStatus(`Matched with ${opponentName}`);
   });
@@ -140,14 +144,10 @@ document.addEventListener("DOMContentLoaded", () => {
     if (timerEl) {
       const minutes = Math.floor(data.seconds / 60);
       const seconds = data.seconds % 60;
-      timerEl.innerText = `${minutes}:${seconds.toString().padStart(2,'0')}`;
+      timerEl.innerText = `${minutes}:${seconds.toString().padStart(2, '0')}`;
     }
   });
 
-  /**
-   * ============== 🎯 ส่วนที่แก้ไข 🎯 ==============
-   * แก้ไขการแสดงผลลัพธ์ของเกม
-   */
   socket.on("game_result", (data) => {
     const input = document.getElementById("guess_input");
     const submit = document.getElementById("submit_btn");
@@ -161,16 +161,14 @@ document.addEventListener("DOMContentLoaded", () => {
     if (data.reason === "turns_exhausted") msg += " (turns exhausted)";
     if (data.reason === "opponent_disconnected") msg = "Opponent disconnected — You win!";
 
-    // --- ย้ายการแสดงผลลัพธ์ไปที่ statusDiv ด้านบน ---
     statusDiv.innerText = msg;
-    statusDiv.className = ""; // เคลียร์ class เก่า
+    statusDiv.className = "";
     if (data.result === "win" || data.reason === "opponent_disconnected") {
-        statusDiv.classList.add("status-win");
+      statusDiv.classList.add("status-win");
     } else {
-        statusDiv.classList.add("status-lose");
+      statusDiv.classList.add("status-lose");
     }
-    
-    // --- สร้างปุ่มกลับล็อบบี้ ---
+
     const backBtn = document.createElement("button");
     backBtn.id = "back_lobby_btn";
     backBtn.innerText = "Back to Lobby";
@@ -183,22 +181,20 @@ document.addEventListener("DOMContentLoaded", () => {
       opponentGuessCount = 0;
     });
 
-    // --- เพิ่มปุ่มไว้ใต้กระดานของผู้เล่น ---
     const playerColumn = document.getElementById("player_column");
     if (playerColumn) {
-        playerColumn.appendChild(backBtn);
+      playerColumn.appendChild(backBtn);
     } else {
-      // กรณีฉุกเฉิน หากหา playerColumn ไม่เจอ
       const boardWrapper = document.getElementById("board_wrapper");
       if (boardWrapper) {
-          boardWrapper.appendChild(backBtn);
+        boardWrapper.appendChild(backBtn);
       } else {
-          alert(msg);
-          renderLobby();
+        alert(msg);
+        renderLobby();
       }
     }
   });
-  
+
   socket.on("player_disconnected", (data) => {
     updateStatus(data.message || "Opponent disconnected");
   });
@@ -220,11 +216,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
     appRoot.appendChild(cancelBtn);
   }
-  
-  /**
-   * ============== 🎯 ส่วนที่แก้ไข 🎯 ==============
-   * ลบแถวแสดงชื่อ Player/Opponent ออก
-   */
+
   function renderGameUI() {
     appRoot.innerHTML = "";
     appRoot.appendChild(statusDiv);
@@ -232,8 +224,6 @@ document.addEventListener("DOMContentLoaded", () => {
     const title = document.createElement("h2");
     title.innerText = "Competitive Word Game";
     appRoot.appendChild(title);
-
-    // --- [ลบออก] แถวแสดงชื่อ Player และ Opponent ---
 
     const timerDiv = document.createElement("div");
     timerDiv.id = "timer";
@@ -248,7 +238,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const playerBoard = document.createElement("table");
     playerBoard.id = "player_board";
-    
+
     const inputRow = document.createElement("div");
     inputRow.style.marginTop = "16px";
     inputRow.style.display = "flex";
@@ -272,16 +262,14 @@ document.addEventListener("DOMContentLoaded", () => {
     playerColumn.appendChild(playerBoard);
     playerColumn.appendChild(inputRow);
 
-    // --- ส่วนของคู่ต่อสู้ ---
     const oppWrap = document.createElement("div");
     const oppTitle = document.createElement("h4");
-    // --- [แก้ไข] เปลี่ยน Title ของกระดานเป็นชื่อ Opponent ---
-    oppTitle.innerText = `${opponentName}'s Board`; 
+    oppTitle.innerText = `${opponentName}'s Board`;
     oppTitle.style.marginLeft = "15px";
 
     const oppTable = document.createElement("table");
     oppTable.id = "opponent_table";
-    
+
     oppWrap.appendChild(oppTitle);
     oppWrap.appendChild(oppTable);
 
@@ -297,7 +285,7 @@ document.addEventListener("DOMContentLoaded", () => {
     opponentGuessCount = 0;
   }
 
-  function createBoard(tableId, isOpponent=false) {
+  function createBoard(tableId, isOpponent = false) {
     const table = document.getElementById(tableId);
     table.innerHTML = "";
     for (let r = 0; r < 6; r++) {
@@ -310,10 +298,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  /**
-   * ============== 🎯 ส่วนที่แก้ไข 🎯 ==============
-   * ลบการอัปเดตสถานะ "Submitting guess" ออก
-   */
   function submitGuess() {
     const input = document.getElementById("guess_input");
     const guess = (input && input.value) ? input.value.toUpperCase().trim() : "";
@@ -325,7 +309,6 @@ document.addEventListener("DOMContentLoaded", () => {
       updateStatus("You are not in a room yet.");
       return;
     }
-    // --- [ลบออก] บรรทัดอัปเดตสถานะตอนส่งคำตอบ ---
     socket.emit("submit_guess", { room: roomId, guess: guess });
     if (input) input.value = "";
   }
@@ -352,7 +335,9 @@ document.addEventListener("DOMContentLoaded", () => {
     const table = document.getElementById("opponent_table");
     const row = table.rows[opponentGuessCount];
     if (row) {
-      for (let i = d = 0; i < 5; i++) {
+
+      for (let i = 0; i < 5; i++) {
+
         const cell = row.cells[i];
         if (feedback[i] === "G") cell.className = "green";
         else if (feedback[i] === "Y") cell.className = "yellow";
@@ -361,5 +346,4 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     opponentGuessCount++;
   });
-
 });
