@@ -13,9 +13,9 @@ from game_core.core_logic import WordGame
 app = Flask(__name__, static_folder="../../static", template_folder="../../client")
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode="eventlet")
 
-waiting_players = []        
-rooms = {}                  
-room_codes = {}             
+waiting_players = []
+rooms = {}
+room_codes = {}
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CLIENT_DIR = os.path.join(BASE_DIR, "../../client")
@@ -30,7 +30,6 @@ def generate_code():
         code = f"{random.randint(0, 999999):06d}"
         if code not in room_codes:
             return code
-
     return f"{random.randint(0, 999999):06d}"
 
 def cleanup_room(rid):
@@ -56,9 +55,7 @@ def on_disconnect():
 
     for rid, room in list(rooms.items()):
         if any(p["sid"] == sid for p in room["players"]):
-
             if room.get("game") is None:
-
                 other = next((pl for pl in room["players"] if pl["sid"] != sid), None)
                 if other:
                     socketio.emit("status", {"message": "Creator left the room"}, to=other["sid"])
@@ -125,9 +122,8 @@ def on_join_room_code(data):
 
     socketio.start_background_task(room_timer, room_id)
 
-    players_usernames = [pl["username"] for pl in room["players"]]
     for p in room["players"]:
-        emit("matched", {"room": room_id, "players": players_usernames}, room=p["sid"])
+        emit("matched", {"room": room_id, "players": room["players"]}, room=p["sid"])
 
     print(f"[JOIN_ROOM] {username} ({sid}) joined room {room_id} code={code}, secret={secret}")
 
@@ -165,7 +161,7 @@ def on_find_match(data):
         for p in players:
             emit(
                 "matched",
-                {"room": room_id, "players": [pl["username"] for pl in players]},
+                {"room": room_id, "players": players},
                 room=p["sid"]
             )
 
@@ -175,20 +171,17 @@ def room_timer(rid):
     """Background timer that emits time_update and handles timeout outcomes."""
     while True:
         if rid not in rooms:
-
             print(f"[TIMER] Stopping timer for removed room {rid}")
             return
 
         room = rooms[rid]
         end_time = room.get("end_time")
         if not end_time:
-
             eventlet.sleep(1)
             continue
 
         remaining = int((end_time - datetime.now()).total_seconds())
         if remaining <= 0:
-
             for p in room["players"]:
                 socketio.emit("game_result", {"result": "lose", "reason": "time_expired"}, to=p["sid"])
             cleanup_room(rid)
@@ -273,11 +266,9 @@ def on_leave_room(data):
     for rid, room in list(rooms.items()):
         for p in room["players"]:
             if p["sid"] == sid:
-
                 if room.get("game") is None:
                     cleanup_room(rid)
                 else:
-
                     opponent = next((pl for pl in room["players"] if pl["sid"] != sid), None)
                     if opponent:
                         socketio.emit("game_result", {"result": "win", "reason": "opponent_left"}, to=opponent["sid"])
