@@ -3,6 +3,7 @@
 ---
 
 Colab : [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1DxFdLIibwzhjiTtkV1wLJiPWEMSaa_k6?usp=sharing)
+https://files.catbox.moe/bcst24.mp4
 
 # Competitive Web-based Word Guessing Game
 
