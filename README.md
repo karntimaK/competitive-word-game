@@ -1,5 +1,8 @@
 ## **README.md**
 
+---
+
+Colab : [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1DxFdLIibwzhjiTtkV1wLJiPWEMSaa_k6?usp=sharing)
 
 # Competitive Web-based Word Guessing Game
 
